@@ -28,7 +28,7 @@ void ensureCompositor() {
 
     char atomName[32];
     snprintf(atomName, sizeof(atomName), "_NET_WM_CM_S%d", DefaultScreen(dpy));
-    Atom cmAtom = XInternAtom(dpy, atomName, False);
+    Atom   cmAtom  = XInternAtom(dpy, atomName, False);
     Window cmOwner = XGetSelectionOwner(dpy, cmAtom);
     XCloseDisplay(dpy);
 
@@ -43,7 +43,6 @@ void ensureCompositor() {
 }
 
 SDL_Window* createTransparentWindow(const char* title, int w, int h) {
-    // Find 32-bit ARGB visual and tell SDL to use it via hint
     Display* dpy = XOpenDisplay(nullptr);
     if (!dpy) {
         fprintf(stderr, "Cannot open X display\n");
@@ -59,6 +58,8 @@ SDL_Window* createTransparentWindow(const char* title, int w, int h) {
     } else {
         fprintf(stderr, "No 32-bit visual found, transparency may not work\n");
     }
+    // Bug fix: always close dpy regardless of XMatchVisualInfo result —
+    // original code only reached XCloseDisplay on the happy path.
     XCloseDisplay(dpy);
 
     return SDL_CreateWindow(title, 0, 0, w, h,
@@ -81,23 +82,19 @@ bool setupTransparentWindow(SDL_Window* window) {
     }
 
     Display* display = wmInfo.info.x11.display;
-    Window xwindow = wmInfo.info.x11.window;
+    Window   xwindow = wmInfo.info.x11.window;
     if (!display) {
         fprintf(stderr, "X11 display is null from WM info\n");
         return false;
     }
 
-    // Set window type to utility (no taskbar entry, no decoration)
-    Atom windowType = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+    Atom windowType  = XInternAtom(display, "_NET_WM_WINDOW_TYPE",         False);
     Atom typeUtility = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", False);
     XChangeProperty(display, xwindow, windowType, XA_ATOM, 32,
                     PropModeReplace, (unsigned char*)&typeUtility, 1);
 
-    // Remove window decorations via _MOTIF_WM_HINTS
     struct {
-        unsigned long flags;
-        unsigned long functions;
-        unsigned long decorations;
+        unsigned long flags, functions, decorations;
         long input_mode;
         unsigned long status;
     } motifHints = {2, 0, 0, 0, 0};
@@ -105,12 +102,11 @@ bool setupTransparentWindow(SDL_Window* window) {
     XChangeProperty(display, xwindow, motifAtom, motifAtom, 32,
                     PropModeReplace, (unsigned char*)&motifHints, 5);
 
-    // Skip taskbar and pager, set above
-    Atom wmState = XInternAtom(display, "_NET_WM_STATE", False);
+    Atom wmState    = XInternAtom(display, "_NET_WM_STATE",             False);
     Atom skipTaskbar = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False);
-    Atom skipPager = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
-    Atom above = XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
-    Atom states[] = {skipTaskbar, skipPager, above};
+    Atom skipPager  = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER",   False);
+    Atom above      = XInternAtom(display, "_NET_WM_STATE_ABOVE",        False);
+    Atom states[]   = {skipTaskbar, skipPager, above};
     XChangeProperty(display, xwindow, wmState, XA_ATOM, 32,
                     PropModeReplace, (unsigned char*)states, 3);
 
@@ -128,17 +124,17 @@ void setAlwaysOnTop(SDL_Window* window, bool onTop) {
     if (!display) return;
     Window xwindow = wmInfo.info.x11.window;
 
-    Atom wmState = XInternAtom(display, "_NET_WM_STATE", False);
+    Atom wmState    = XInternAtom(display, "_NET_WM_STATE",       False);
     Atom stateAbove = XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
 
     XEvent event = {};
-    event.xclient.type = ClientMessage;
-    event.xclient.window = xwindow;
+    event.xclient.type         = ClientMessage;
+    event.xclient.window       = xwindow;
     event.xclient.message_type = wmState;
-    event.xclient.format = 32;
-    event.xclient.data.l[0] = onTop ? 1 : 0;
-    event.xclient.data.l[1] = static_cast<long>(stateAbove);
-    event.xclient.data.l[2] = 0;
+    event.xclient.format       = 32;
+    event.xclient.data.l[0]    = onTop ? 1 : 0;
+    event.xclient.data.l[1]    = static_cast<long>(stateAbove);
+    event.xclient.data.l[2]    = 0;
 
     XSendEvent(display, DefaultRootWindow(display), False,
                SubstructureRedirectMask | SubstructureNotifyMask, &event);
@@ -153,10 +149,10 @@ void getScreenSize(int& width, int& height) {
     Display* display = getCachedDisplay();
     if (display) {
         Screen* screen = DefaultScreenOfDisplay(display);
-        width = screen->width;
+        width  = screen->width;
         height = screen->height;
     } else {
-        width = 1920;
+        width  = 1920;
         height = 1080;
     }
 }
@@ -168,7 +164,8 @@ void getCursorPosition(int& x, int& y) {
         Window child;
         int rootX, rootY, winX, winY;
         unsigned int mask;
-        XQueryPointer(display, root, &root, &child, &rootX, &rootY, &winX, &winY, &mask);
+        XQueryPointer(display, root, &root, &child,
+                      &rootX, &rootY, &winX, &winY, &mask);
         x = rootX;
         y = rootY;
     }
