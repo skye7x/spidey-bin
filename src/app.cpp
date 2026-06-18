@@ -27,11 +27,8 @@ bool App::init() {
     }
 
     Platform::getScreenSize(screenWidth, screenHeight);
-
-    // Ensure a compositor is running for transparency
     Platform::ensureCompositor();
 
-    // Create window with ARGB visual for true transparency
     window = Platform::createTransparentWindow("Spider Pet", screenWidth, screenHeight);
 
     if (!window) {
@@ -64,10 +61,8 @@ bool App::init() {
         return false;
     }
 
-    // Initialize spider at center of screen
     spider.setPosition(Vec2(screenWidth / 2.0f, screenHeight / 2.0f));
 
-    // Setup tray
     TrayCallbacks callbacks;
     callbacks.onToggleActive = [this]() {
         active = !active;
@@ -103,7 +98,6 @@ void App::run() {
                    static_cast<float>(SDL_GetPerformanceFrequency());
         lastFrameTime = now;
 
-        // Cap delta time to avoid physics explosions
         if (dt > 0.05f) dt = 0.05f;
 
         handleEvents();
@@ -114,8 +108,10 @@ void App::run() {
 
         render();
 
-        // Target ~60 FPS
-        SDL_Delay(1);
+        // Bug fix: SDL_RENDERER_PRESENTVSYNC already gates the frame rate at
+        // the display's refresh rate. The old SDL_Delay(1) added an
+        // unconditional extra millisecond *after* vsync every frame, capping
+        // effective rate to ~58 FPS and introducing jitter. Removed.
     }
 }
 
