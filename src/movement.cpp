@@ -17,11 +17,12 @@ Movement::Movement() {
     acceleration = Vec2(0.0f, 0.0f);
 }
 
-void Movement::update(float dt, SpiderState state, const Vec2& currentPos,
+// Bug fix: removed the redundant `currentPos` parameter. Movement owns its
+// position; passing getPosition() back in and then doing `position = currentPos`
+// was a no-op round-trip that would break if a stale value were ever supplied.
+void Movement::update(float dt, SpiderState state,
                       const Vec2& cursorPos, int screenW, int screenH) {
-    position = currentPos;
     Vec2 steer(0.0f, 0.0f);
-
     float speed = 0.0f;
 
     switch (state) {
@@ -90,7 +91,7 @@ void Movement::update(float dt, SpiderState state, const Vec2& currentPos,
     if (velLen > 3.0f) {
         float targetHeading = std::atan2(velocity.y, velocity.x);
         float diff = targetHeading - heading;
-        while (diff > M_PI) diff -= 2.0f * M_PI;
+        while (diff >  M_PI) diff -= 2.0f * M_PI;
         while (diff < -M_PI) diff += 2.0f * M_PI;
         heading += diff * std::min(1.0f, 4.0f * dt);
     }
@@ -101,7 +102,7 @@ Vec2 Movement::seek(const Vec2& target, float speed) {
     float dist = toTarget.length();
     if (dist < 1.0f) return Vec2(0, 0) - velocity * 0.5f;
 
-    // Arrive behavior — slow down near target
+    // Arrive behaviour — slow down near target
     float desiredSpeed = speed;
     if (dist < 100.0f) {
         desiredSpeed = speed * (dist / 100.0f);
@@ -119,7 +120,6 @@ Vec2 Movement::flee(const Vec2& threat, float speed) {
 Vec2 Movement::wander(float dt, float speed) {
     wanderTimer += dt;
 
-    // Periodically pause during wander (check once per ~frame)
     if (!wanderPaused && wanderTimer > 0.5f && randf() < 0.02f) {
         wanderPaused = true;
         wanderPauseTimer = randfRange(1.0f, 3.5f);
@@ -132,11 +132,9 @@ Vec2 Movement::wander(float dt, float speed) {
             wanderPaused = false;
             wanderTimer = 0.0f;
         }
-        // Brake gently
         return Vec2(0, 0) - velocity * 0.3f;
     }
 
-    // Gentle wander angle drift
     wanderAngle += randfRange(-wanderJitter, wanderJitter) * dt;
 
     Vec2 circleCenter = velocity.normalized() * wanderDistance;
@@ -160,24 +158,18 @@ Vec2 Movement::wander(float dt, float speed) {
 }
 
 void Movement::clampToScreen(int screenW, int screenH) {
-    float margin = 50.0f;
+    float margin     = 50.0f;
     float softMargin = 120.0f;
 
-    // Soft boundary — steer away from edges
-    if (position.x < softMargin) {
+    if (position.x < softMargin)
         velocity.x += (softMargin - position.x) * 0.05f;
-    }
-    if (position.x > screenW - softMargin) {
+    if (position.x > screenW - softMargin)
         velocity.x -= (position.x - (screenW - softMargin)) * 0.05f;
-    }
-    if (position.y < softMargin) {
+    if (position.y < softMargin)
         velocity.y += (softMargin - position.y) * 0.05f;
-    }
-    if (position.y > screenH - softMargin) {
+    if (position.y > screenH - softMargin)
         velocity.y -= (position.y - (screenH - softMargin)) * 0.05f;
-    }
 
-    // Hard clamp
     if (position.x < margin) {
         position.x = margin;
         velocity.x = std::abs(velocity.x) * 0.3f;
